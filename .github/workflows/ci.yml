@@ -32,9 +32,9 @@ jobs:
             --output bannertool.zip
           echo "e4259c08fe8944ebadd5f4b96f9a8603e5427338074cfc46323fbbc3410d51ed  bannertool.zip" | sha256sum --check
           curl --fail --location --silent --show-error \
-            https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.19.0/makerom-v0.19.0-ubuntu_x86_64.zip \
+            https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.17/makerom-v0.17-ubuntu_x86_64.zip \
             --output makerom.zip
-          echo "287b809dec064e0ad597e3d272c49ecb7eed41693d5ee6fef9d8a8aa24c2497e  makerom.zip" | sha256sum --check
+          echo "976c17a78617e157083a8e342836d35c47a45940f9d0209ee8fd210a81ba7bc0  makerom.zip" | sha256sum --check
           unzip -j bannertool.zip linux-x86_64/bannertool -d tools
           unzip -j makerom.zip makerom -d tools
           sudo install -m 0755 tools/bannertool tools/makerom /usr/local/bin/
