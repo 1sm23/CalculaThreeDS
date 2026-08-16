@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   evaluator-tests:
@@ -22,5 +23,14 @@ jobs:
     container: devkitpro/devkitarm:latest
     steps:
       - uses: actions/checkout@v5
-      - name: Build 3DS application
-        run: make
+      - name: Build 3DS packages
+        run: make package
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: CalculaThreeDS-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            out/CalculaThreeDS.3dsx
+            out/CalculaThreeDS.smdh
+            out/CalculaThreeDS.cia

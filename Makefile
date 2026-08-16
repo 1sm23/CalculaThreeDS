@@ -34,6 +34,23 @@ include $(DEVKITARM)/3ds_rules
 APP_TITLE	:=	CalculaThreeDS
 APP_DESCRIPTION	:=	Simple scientific calculator for 3DS
 APP_AUTHOR	:=	LiquidFenrir
+ICON		:=	icon.png
+
+APP_VERSION_MAJOR	:=	0
+APP_VERSION_MINOR	:=	2
+APP_VERSION_MICRO	:=	0
+
+BANNER_AUDIO	:=	$(TOPDIR)/meta/audio.wav
+BANNER_IMAGE	:=	$(TOPDIR)/meta/banner.png
+RSF_PATH	:=	$(TOPDIR)/meta/app.rsf
+
+# Keep this unique: installing another CIA with the same ID will overwrite it.
+UNIQUE_ID	:=	0xCA1C0
+PRODUCT_CODE	:=	CTR-H-CALC
+ICON_FLAGS	:=	nosavebackups,visible
+
+MAKEROM	?=	makerom
+BANNERTOOL	?=	bannertool
 
 TARGET		:=	CalculaThreeDS
 BUILD		:=	build
@@ -153,11 +170,18 @@ ifneq ($(ROMFS),)
 	export _3DSXFLAGS += --romfs=$(CURDIR)/$(ROMFS)
 endif
 
-.PHONY: all clean
+.PHONY: all clean 3dsx cia package
 
 #---------------------------------------------------------------------------------
-all: $(BUILD) $(GFXBUILD) $(OUTDIR) $(DEPSDIR) $(ROMFS_T3XFILES) $(T3XHFILES)
-	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+all: 3dsx
+
+3dsx: $(BUILD) $(GFXBUILD) $(OUTDIR) $(DEPSDIR) $(ROMFS_T3XFILES) $(T3XHFILES)
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile "$(OUTPUT).3dsx"
+
+cia: 3dsx
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile "$(OUTPUT).cia"
+
+package: cia
 
 $(BUILD):
 	@mkdir -p $@
@@ -191,6 +215,18 @@ else
 # main targets
 #---------------------------------------------------------------------------------
 $(OUTPUT).3dsx	:	$(OUTPUT).elf $(_3DSXDEPS)
+
+CIA_BANNER	:=	$(TOPDIR)/$(BUILD)/banner.bnr
+CIA_ICON	:=	$(TOPDIR)/$(BUILD)/icon.icn
+
+$(CIA_BANNER)	:	$(BANNER_IMAGE) $(BANNER_AUDIO)
+	@$(BANNERTOOL) makebanner -i "$(BANNER_IMAGE)" -a "$(BANNER_AUDIO)" -o "$@"
+
+$(CIA_ICON)	:	$(APP_ICON)
+	@$(BANNERTOOL) makesmdh -s "$(APP_TITLE)" -l "$(APP_DESCRIPTION)" -p "$(APP_AUTHOR)" -i "$(APP_ICON)" -f "$(ICON_FLAGS)" -o "$@"
+
+$(OUTPUT).cia	:	$(OUTPUT).elf $(CIA_BANNER) $(CIA_ICON) $(RSF_PATH)
+	@$(MAKEROM) -f cia -target t -exefslogo -o "$@" -elf "$(OUTPUT).elf" -rsf "$(RSF_PATH)" -banner "$(CIA_BANNER)" -icon "$(CIA_ICON)" -DAPP_TITLE="$(APP_TITLE)" -DAPP_PRODUCT_CODE="$(PRODUCT_CODE)" -DAPP_UNIQUE_ID="$(UNIQUE_ID)" -DAPP_ROMFS="$(TOPDIR)/$(ROMFS)" -major $(APP_VERSION_MAJOR) -minor $(APP_VERSION_MINOR) -micro $(APP_VERSION_MICRO)
 
 $(OFILES_SOURCES) : $(HFILES)
 

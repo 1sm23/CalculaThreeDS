@@ -20,6 +20,20 @@ The D-PAD and touchscreen let you move the cursor after you typed things out
 The B button or delete key will remove content  
 And finally, the A button or equals key will launch the calculation  
 
+## Building
+
+Install the devkitPro 3DS toolchain with libctru, Citro3D, Citro2D,
+`makerom`, and `bannertool`, then run one of these targets:
+
+```sh
+make          # out/CalculaThreeDS.3dsx and .smdh
+make cia      # also builds out/CalculaThreeDS.cia
+make package  # builds the complete release package
+```
+
+The `.3dsx` is for the Homebrew Launcher. The `.cia` is an installable package
+for custom-firmware systems and uses title ID `000400000CA1C000`.
+
 ## Credits
 LiquidFenrir for writing the application  
 devkitPro for devkitARM and libctru/libcitro3d/libcitro2d which allowed me to make this run  
