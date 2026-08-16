@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  evaluator-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build evaluator tests
+        run: >-
+          g++ -std=c++17 -Wall -Wextra -Werror -pedantic
+          source/evaluator.cpp tests/evaluator_tests.cpp
+          -o evaluator_tests
+      - name: Run evaluator tests
+        run: ./evaluator_tests
+
+  three-ds-build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build 3DS application
+        run: make

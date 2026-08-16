@@ -1,13 +1,10 @@
 #include "equation.h"
+#include "evaluator.h"
 #include "sprites.h"
 #include "text.h"
 #include "colors.h"
 #include <algorithm>
 #include <cmath>
-
-static const Number E_VAL(std::exp(1.0));
-static const Number PI_VAL(M_PI);
-static const Number I_VAL(0.0, 1.0);
 
 Equation::Equation() : parts(3)
 {
@@ -586,22 +583,10 @@ void Equation::optimize()
 
 std::pair<Number, bool> Equation::calculate(std::map<std::string, Number>& variables, int& error_part, int& error_position)
 {
-    #define ERROR_AT(part, pos) { error_part = part; error_position = pos; return {}; }
+    bool tokenization_error = false;
+    #define ERROR_AT(part, pos) { tokenization_error = true; error_part = part; error_position = pos; return {}; }
 
-    struct Token {
-        enum class Type {
-            Number,
-            Variable,
-            Function,
-            Operator,
-            ParenOpen,
-            ParenClose,
-        };
-
-        std::string_view value;
-        int part, position;
-        Type type;
-    };
+    using Token = EvaluationToken;
     const auto base_tokens = [&, this]() -> std::vector<Token> {
         std::vector<Token> toks;
         int start = 0;
@@ -826,218 +811,34 @@ std::pair<Number, bool> Equation::calculate(std::map<std::string, Number>& varia
 
         return toks;
     }();
-    if(base_tokens.empty()) return std::make_pair(Number{}, true);
-
-    const auto final_rpn = [&]() -> std::vector<const Token*> {
-        std::vector<const Token*> postfix;
-        std::vector<const Token*> opstack;
-
-        const auto get_prec = [](std::string_view op) -> int {
-            switch(op.front())
-            {
-                case '^': return 4;
-                case '*': return 3;
-                case '/': return 3;
-                case '+': return 2;
-                case '-': return 2;
-                case '>': return 1;
-                default: return 0;
-            }
-        };
-
-        const auto get_assoc = [](std::string_view op) -> bool {
-            return op.front() == '^';
-        };
-
-        for(const Token& tok : base_tokens)
-        {
-            if(tok.type == Token::Type::Variable || tok.type == Token::Type::Number)
-            {
-                postfix.push_back(&tok);
-            }
-            else if(tok.type == Token::Type::ParenOpen)
-            {
-                opstack.push_back(&tok);
-            }
-            else if(tok.type == Token::Type::ParenClose)
-            {
-                while(opstack.size() && opstack.back()->type != Token::Type::ParenOpen)
-                {
-                    postfix.push_back(opstack.back());
-                    opstack.pop_back();
-                }
-
-                opstack.pop_back();  // open paren (mismatch cannot happen)
-            }
-            else if(tok.type == Token::Type::Function)
-            {
-                opstack.push_back(&tok);
-            }
-            else if(tok.type == Token::Type::Operator)
-            {
-                auto prec = get_prec(tok.value);
-                while(opstack.size())
-                {
-                    if(const Token* op = opstack.back();
-                        op->type != Token::Type::ParenOpen && (
-                            op->type == Token::Type::Function ||
-                            get_prec(op->value) >= prec ||
-                            (get_prec(op->value) == prec && get_assoc(op->value))
-                        )
-                    )
-                    {
-                        postfix.push_back(op);
-                        opstack.pop_back();
-                    }
-                    else
-                        break;
-                }
-                opstack.push_back(&tok);
-            }
-        }
-
-        while(opstack.size())
-        {
-            postfix.push_back(opstack.back());
-            opstack.pop_back();
-        }
-
-        return postfix;
-    }();
-    if(final_rpn.empty()) std::make_pair(Number{}, true);
-
     #undef ERROR_AT
-    #define ERROR_AT(part, pos) { error_part = part; error_position = pos; return std::make_pair(Number{}, true); }
-
-    struct Value {
-        Number val;
-        std::string_view assoc_variable;
-
-        Value(std::string_view v) : val(v) { }
-        Value(const Number& v) : val(v) { }
-        Value(const Number& v, std::string_view a) : val(v), assoc_variable(a) { }
-    };
-    const auto get_var = [&](std::string_view name) -> Value {
-        if(auto it = variables.find(std::string(name)); it != variables.end())
-        {
-            return {it->second, name};
-        }
-        return {{}, name};
-    };
-
-    #define MK_WRAPPER_FN(fname, fn) {#fname, [](std::vector<Value>& vals) { \
-        vals.back() = Value(std::fn(vals.back().val.value)); \
-    }}
-    #define MK_WRAPPER(fname) MK_WRAPPER_FN(fname, fname)
-
-    const std::map<std::string_view, void(*)(std::vector<Value>&)> function_handlers{
-        MK_WRAPPER(abs),
-        MK_WRAPPER(sqrt),
-        MK_WRAPPER(conj),
-
-        MK_WRAPPER(cos),
-        MK_WRAPPER(sin),
-        MK_WRAPPER(tan),
-
-        MK_WRAPPER(acos),
-        MK_WRAPPER(asin),
-        MK_WRAPPER(atan),
-
-        MK_WRAPPER(cosh),
-        MK_WRAPPER(sinh),
-        MK_WRAPPER(tanh),
-
-        MK_WRAPPER(acosh),
-        MK_WRAPPER(asinh),
-        MK_WRAPPER(atanh),
-
-        MK_WRAPPER(exp),
-        MK_WRAPPER_FN(ln, log),
-        MK_WRAPPER_FN(log, log10),
-    };
-
-    std::vector<Value> value_stack;
-    for(const Token* tok : final_rpn)
+    if(tokenization_error) return std::make_pair(Number{}, true);
+    if(base_tokens.empty())
     {
-        if(tok->type == Token::Type::Number)
-        {
-            if(tok->value.front() == '.' || tok->value.back() == '.')
-            {
-                ERROR_AT(tok->part, tok->position);
-            }
-            else
-            {
-                value_stack.emplace_back(tok->value);
-            }
-        }
-        else if(tok->type == Token::Type::Variable)
-        {
-            if(tok->value == "P")
-            {
-                value_stack.emplace_back(PI_VAL);
-            }
-            else if(tok->value == "e")
-            {
-                value_stack.emplace_back(E_VAL);
-            }
-            else if(tok->value == "i")
-            {
-                value_stack.emplace_back(I_VAL);
-            }
-            else
-            {
-                value_stack.push_back(get_var(tok->value));
-            }
-        }
-        else if(tok->type == Token::Type::Operator)
-        {
-            #define OP_CASE(op) case #op[0] : { \
-                const Value left = value_stack.back(); \
-                value_stack.pop_back(); \
-                const Value right = value_stack.back(); \
-                value_stack.pop_back(); \
-                value_stack.emplace_back(right.val.value op left.val.value); \
-            } break;
-            switch(tok->value.front())
-            {
-                OP_CASE(+)
-                OP_CASE(-)
-                OP_CASE(*)
-                OP_CASE(/)
-                case '^':
-                {
-                    const Value left = value_stack.back();
-                    value_stack.pop_back();
-                    const Value right = value_stack.back();
-                    value_stack.pop_back();
-
-                    value_stack.emplace_back(std::pow(right.val.value, left.val.value));
-                }
-                break;
-                case '>':
-                {
-                    const Value left = value_stack.back();
-                    value_stack.pop_back();
-                    const Value right = value_stack.back();
-                    value_stack.pop_back();
-
-                    variables.insert_or_assign(std::string(left.assoc_variable), right.val.value);
-                    value_stack.push_back(right);
-                }
-                break;
-            }
-        }
-        else if(tok->type == Token::Type::Function)
-        {
-            if(auto it = function_handlers.find(tok->value); it != function_handlers.end())
-            {
-                it->second(value_stack);
-            }
-        }
+        error_part = parts.size() > 1 ? 1 : 0;
+        error_position = 0;
+        return std::make_pair(Number{}, true);
     }
 
-    return {value_stack.back().val, false};
-    #undef ERROR_AT
+    std::map<std::string, std::complex<double>> evaluation_variables;
+    for(const auto& [name, value] : variables)
+    {
+        evaluation_variables.insert_or_assign(name, value.value);
+    }
+
+    const EvaluationResult evaluation = evaluate_tokens(base_tokens, evaluation_variables);
+    if(evaluation.error)
+    {
+        error_part = evaluation.error_part;
+        error_position = evaluation.error_position;
+        return std::make_pair(Number{}, true);
+    }
+
+    for(const auto& [name, value] : evaluation_variables)
+    {
+        variables.insert_or_assign(name, Number(value));
+    }
+    return std::make_pair(Number(evaluation.value), false);
 }
 
 int Equation::set_special(const int current_part_id, const int at_position, const Part::Specialty special)
