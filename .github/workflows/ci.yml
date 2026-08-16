@@ -40,8 +40,11 @@ jobs:
           sudo install -m 0755 tools/bannertool tools/makerom /usr/local/bin/
       - name: Build 3DS packages
         run: make package
+      - name: Create checksums
+        working-directory: out
+        run: sha256sum CalculaThreeDS.3dsx CalculaThreeDS.smdh CalculaThreeDS.cia > SHA256SUMS
       - name: Upload packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: CalculaThreeDS-${{ github.sha }}
           if-no-files-found: error
@@ -49,3 +52,4 @@ jobs:
             out/CalculaThreeDS.3dsx
             out/CalculaThreeDS.smdh
             out/CalculaThreeDS.cia
+            out/SHA256SUMS
