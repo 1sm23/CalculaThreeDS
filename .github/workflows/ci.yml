@@ -8,7 +8,7 @@ jobs:
   evaluator-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build evaluator tests
         run: >-
           g++ -std=c++17 -Wall -Wextra -Werror -pedantic
@@ -21,6 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     container: devkitpro/devkitarm:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build 3DS application
         run: make

@@ -239,6 +239,8 @@ EvaluationResult evaluate_tokens(
             {
                 if(value_stack.empty()) return error_at(token);
                 if(token.value == "-") value_stack.back().value = -value_stack.back().value;
+                if(value_stack.back().value.imag() == 0.0)
+                    value_stack.back().value.imag(0.0);
                 value_stack.back().assignable_variable = {};
                 continue;
             }
